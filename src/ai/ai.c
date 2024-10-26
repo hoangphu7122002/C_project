@@ -216,14 +216,19 @@ void find_solution(chessformer_t* init_data, bool show_solution){
 	//******************* PHU CODE********************
 	node_t* start_node = create_init_node(init_data);
 	
+	// Initialize Queue and add starter node in this queue
 	queue_t queue;
 	initialize_queue(&queue);
 	enqueue(&queue, start_node);
 
+	// ExploredTable to record all node generated, benefit: free and remove this node is easier
 	node_t* exploredTable[10000];
 
+	//Generated all possible move on knight and queen
 	int dx[1000];
 	int dy[1000];
+
+	// Queen move possible
 	int mvx[8] = {1, -1, 1, -1, 0, 1, -1, 0};
 	int mvy[8] = {1, -1, -1, 1, 1, 0, 0, -1};
 
@@ -238,6 +243,7 @@ void find_solution(chessformer_t* init_data, bool show_solution){
 		}
 	}
 
+	// Knight move possible
 	int knight_delta_x[] = { -1,  1, -2,  2, -2,  2, -1,  1 };
 	int knight_delta_y[] = { -2, -2, -1, -1,  1,  1,  2,  2 };
 	for(int i = 0; i < 8; i++){
@@ -246,36 +252,58 @@ void find_solution(chessformer_t* init_data, bool show_solution){
         num_move += 1;
 	}
 
+	// Continue processing nodes in the queue until it is empty
 	while (!is_queue_empty(&queue)) {
+		// Dequeue the front node from the queue for processing
 		node_t *current_node = dequeue_node(&queue);
+		
+		// Store the dequeued node in the exploredTable to avoid re-processing
 		exploredTable[exploredNodes] = current_node; 
 		exploredNodes++;
-		if (winning_condition(init_data,&current_node->state)) {
+		
+		// Check if the current node meets the winning condition
+		if (winning_condition(init_data, &current_node->state)) {
+			// If winning, save the solution path and the depth of the solution
 			solution = saveSolution(current_node);
 			solution_size = current_node->depth;
-			break;
+			break;  // Stop processing as the solution is found
 		}
+		
+		// Loop through each possible move direction
 		for (int a = 0; a < num_move; ++a) {
 			node_t *new_node;
+			
+			// Apply the move to create a new node; check if player moved successfully
 			bool playerMoved = applyAction(init_data, current_node, &new_node, dx[a], dy[a]);
 			generatedNodes++;
+			
+			// If player did not move, free the unused node and skip further processing
 			if (!playerMoved) {
-				free_state(init_data,new_node);
-                free(new_node);  // Free unused node if the player didn't move
-                continue;
-            }
-			char *flat_map = calloc(init_data->num_chars_map, sizeof(char));
-            flatten_map(init_data, &flat_map, new_node->state.map);
-			if (ht_contains(&hashTable, flat_map)) {
-                duplicatedNodes++;
-				free_state(init_data,new_node);
-                free(new_node);  // Free the node if it's a duplicate
-                free(flat_map);
-                continue;
-            }	
+				free_state(init_data, new_node);  // Free memory for the state map
+				free(new_node);  // Free memory for the new node structure
+				continue;
+			}
 
+			// Create a flattened representation of the map for duplicate detection
+			char *flat_map = calloc(init_data->num_chars_map, sizeof(char));
+			flatten_map(init_data, &flat_map, new_node->state.map);
+
+			// Check if this map state has already been encountered
+			if (ht_contains(&hashTable, flat_map)) {
+				duplicatedNodes++;
+				free_state(init_data, new_node);  // Free state map memory for duplicates
+				free(new_node);  // Free node structure for duplicates
+				free(flat_map);  // Free the flattened map memory
+				continue;
+			}
+
+			// Insert the unique map state into the hash table for future duplicate checks
 			ht_insert(&hashTable, flat_map, flat_map);
-            enqueue(&queue,new_node);  // Add new node to the queue
+			
+			// Enqueue the new node for further exploration in the BFS
+			enqueue(&queue, new_node);
+			
+			// Free the temporary flat_map memory as it's no longer needed
 			free(flat_map);
 		}
 	}
@@ -291,13 +319,14 @@ void find_solution(chessformer_t* init_data, bool show_solution){
 	// Free memory for nodes stored in explored table and generated nodes still 
 	// 		in queue. In Algorithm 2 - also free flat_map used as temporary 
 	// 		variable for storing map.
+	// Free all pointer in exploredTable
 	for (unsigned int i = 0; i < exploredNodes; ++i) {
 		if (exploredTable[i] != NULL) {
 			free_state(init_data,exploredTable[i]);
 			free(exploredTable[i]);
 		}
 	}
-
+	// Free all pointer in queue
 	while (!is_queue_empty(&queue)) {
 		node_t *current_node = dequeue_node(&queue);
 		free_state(init_data,current_node);
