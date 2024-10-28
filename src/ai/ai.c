@@ -347,8 +347,6 @@ void find_solution(chessformer_t* init_data, bool show_solution){
 
 	// endwin();
 	if(solution != NULL){
-		printf("solution");
-		
 		printf("\nSOLUTION:                               \n");
 		printf( "%s\n\n", solution);
 		FILE *fptr = fopen("solution.txt", "w");
